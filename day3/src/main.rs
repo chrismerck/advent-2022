@@ -8,6 +8,7 @@ struct Rucksack {
     left: Vec<char>,
     right: Vec<char>,
     uid: u64,
+    group: u32,
 }
 
 // implement the Rucksack struct
@@ -19,6 +20,7 @@ impl Rucksack {
             left: Vec::new(),
             right: Vec::new(),
             uid: rand::random(),
+            group: 0,
         }
     }
 
@@ -78,6 +80,20 @@ impl Rucksack {
         }
         println!();
     }
+
+    // convert a rucksack to a set of items
+    // without duplicates
+    // combining items from both compartments
+    fn to_set(&self) -> HashSet<char> {
+        let mut set = HashSet::new();
+        for item in &self.left {
+            set.insert(*item);
+        }
+        for item in &self.right {
+            set.insert(*item);
+        }
+        set
+    }
 }
 
 // equality operator for rucksacks
@@ -89,6 +105,35 @@ impl PartialEq for Rucksack {
 }
 
 impl Eq for Rucksack {}
+
+// organize a list of rucksacks into groups
+// return a dictionary mapping group id to list of rucksacks in that group
+// do not clone the rucksacks
+fn organize(rucksacks: &Vec<Rucksack>) -> std::collections::HashMap<u32, Vec<&Rucksack>> {
+    let mut groups = std::collections::HashMap::<u32, Vec<&Rucksack>>::new();
+    for rucksack in rucksacks {
+        let group = rucksack.group;
+        if groups.contains_key(&group) {
+            groups.get_mut(&group).unwrap().push(rucksack);
+        } else {
+            groups.insert(group, vec![rucksack]);
+        }
+    }
+    groups
+}
+
+// find intersection of all rucksacks in a group
+fn intersect_group(rucksacks: &Vec<&Rucksack>) -> HashSet<char> {
+    // apply bitwise and operator to all rucksacks in group
+    let mut intersection = rucksacks[0].to_set();
+    for rucksack in rucksacks {
+        intersection = intersection
+            .intersection(&rucksack.to_set())
+            .map(|&x| x)
+            .collect();
+    }
+    intersection
+}
 
 // get priority of item
 // a--z: 1--26
@@ -110,8 +155,16 @@ fn get_priority(item: char) -> u32 {
 fn load_rucksacks(filename: &str) -> Vec<Rucksack> {
     let mut rucksacks = Vec::new();
     let contents = std::fs::read_to_string(filename).expect("Error reading file");
+    let mut group = 0;
+    let mut elf_in_group = 0;
     for line in contents.lines() {
         rucksacks.push(Rucksack::from_string(line));
+        rucksacks.last_mut().unwrap().group = group;
+        elf_in_group += 1;
+        if elf_in_group == 3 {
+            elf_in_group = 0;
+            group += 1;
+        }
     }
     rucksacks
 }
@@ -157,4 +210,19 @@ fn main() {
 
     // print the sum
     println!("Sum of left-right common item priorities = {}", sum);
+
+    // organize rucksacks into groups
+    let groups = organize(&rucksacks);
+
+    // find intersection of each group
+    let mut sum = 0;
+    for group in groups.values() {
+        let intersection = intersect_group(group);
+        let item = get_item(&intersection);
+        println!("Group {} intersection = {}", group[0].group, item);
+        sum += get_priority(item);
+    }
+
+    // print the sum
+    println!("Sum of badge priorities = {}", sum);
 }
