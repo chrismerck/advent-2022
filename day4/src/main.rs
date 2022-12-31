@@ -31,10 +31,19 @@ fn load_input() -> Vec<(u32, u32, u32, u32)> {
 fn main() {
     let input = load_input();
     let mut count = 0;
-    for (a1, a2, b1, b2) in input {
+    for (a1, a2, b1, b2) in &input {
         if (a1 >= b1 && a2 <= b2) || (b1 >= a1 && b2 <= a2) {
             count += 1;
         }
     }
-    println!("{} pairs", count);
+    println!("{} pairs overlap entirely", count);
+
+    // now, find the number of pairs that overlap at all
+    count = 0;
+    for (a1, a2, b1, b2) in &input {
+        if (a1 <= b1 && a2 >= b1) || (b1 <= a1 && b2 >= a1) {
+            count += 1;
+        }
+    }
+    println!("{} pairs overlap at all", count);
 }
