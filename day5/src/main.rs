@@ -88,9 +88,9 @@ fn read_input_moves(file: &mut BufReader<File>) -> Vec<(usize, usize, usize)> {
     moves
 }
 
-fn main() {
-    let (mut stacks, moves) = read_input();
-    for (from_stack, to_stack, quantity) in &moves {
+// move crates from one stack to another
+fn move_part1(stacks: &mut Vec<Vec<char>>, moves: &Vec<(usize, usize, usize)>) {
+    for (from_stack, to_stack, quantity) in moves {
         // pop one crate at a time from the from_stack,
         // and push it onto the to_stack
         for _ in 0..*quantity {
@@ -98,6 +98,44 @@ fn main() {
             stacks[*to_stack - 1].push(crate_char);
         }
     }
+}
+
+// move crates, this time maintaining the order of the crates
+// in each stack as they are moved
+fn move_part2(stacks: &mut Vec<Vec<char>>, moves: &Vec<(usize, usize, usize)>) {
+    for (from_stack, to_stack, quantity) in moves {
+        // pop the crates from the from_stack,
+        // and push them onto a temporary stack
+        let mut temp_stack = Vec::new();
+        for _ in 0..*quantity {
+            let crate_char = stacks[*from_stack - 1].pop().unwrap();
+            temp_stack.push(crate_char);
+        }
+        // pop the crates from the temporary stack,
+        // and push them onto the to_stack
+        for _ in 0..*quantity {
+            let crate_char = temp_stack.pop().unwrap();
+            stacks[*to_stack - 1].push(crate_char);
+        }
+    }
+}
+
+// accept an argument specifying --part1 or --part2
+fn main() {
+    let args: Vec<String> = std::env::args().collect();
+    if args.len() != 2 {
+        panic!("Usage: cargo run --release --bin day5 -- --[part1|part2]");
+    }
+
+    let (mut stacks, moves) = read_input();
+
+    // move crates
+    match args[1].as_str() {
+        "--part1" => move_part1(&mut stacks, &moves),
+        "--part2" => move_part2(&mut stacks, &moves),
+        _ => panic!("Usage: cargo run --release --bin day5 -- --[part1|part2]"),
+    }
+
     // print final stacks
     for (i, stack) in stacks.iter().enumerate() {
         println!("Stack {}: {:?}", i + 1, stack);
