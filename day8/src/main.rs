@@ -147,22 +147,106 @@ fn find_vis_from_west(grid: &Grid, vis: &mut Grid) {
 // compute visibility from all directions
 // by rotating the grid (and vis) 3 times
 // and accumulating the visibility
-fn find_vis(mut grid: Grid) -> Grid {
+fn find_vis(grid: &Grid) -> Grid {
     let mut vis = create_grid(grid.len());
-    find_vis_from_west(&grid, &mut vis);
-    grid = rotate_grid(&grid);
-    vis = rotate_grid(&vis);
-    find_vis_from_west(&grid, &mut vis);
-    grid = rotate_grid(&grid);
-    vis = rotate_grid(&vis);
-    find_vis_from_west(&grid, &mut vis);
-    grid = rotate_grid(&grid);
-    vis = rotate_grid(&vis);
-    find_vis_from_west(&grid, &mut vis);
-    grid = rotate_grid(&grid);
-    vis = rotate_grid(&vis);
-    vis
+    find_vis_from_west(grid, &mut vis);
+    let mut rotated_grid = rotate_grid(grid);
+    let mut rotated_vis = rotate_grid(&vis);
+    find_vis_from_west(&rotated_grid, &mut rotated_vis);
+    rotated_vis = rotate_grid(&rotated_vis);
+    rotated_grid = rotate_grid(&rotated_grid);
+    find_vis_from_west(&rotated_grid, &mut rotated_vis);
+    rotated_vis = rotate_grid(&rotated_vis);
+    rotated_grid = rotate_grid(&rotated_grid);
+    find_vis_from_west(&rotated_grid, &mut rotated_vis);
+    rotated_vis = rotate_grid(&rotated_vis);
+    rotated_grid = rotate_grid(&rotated_grid);
+    rotated_vis
 }
+
+
+
+
+
+
+
+// compute visibility from a particular tree within the grid
+// for example in the grid:
+//  30373
+//  25512
+//  65332
+//  33549
+//  35390
+// the tree at (2, 3) can see 1 tree to the north, 2 trees to the east,
+// 2 trees to the south, and 1 tree to the west.
+// Return the visibility score, which is the product of the number of trees
+// seen in each direction (1 * 2 * 2 * 1 = 4)
+fn find_vis_from(grid: &Grid, vis: &mut Grid, i: usize, j: usize) -> u32 {
+    let n = grid.len();
+    let mut score = 1;
+    let my_height = grid[i][j];
+    let mut dist = 0;
+    // north
+    for k in (0..i).rev() {
+        vis[k][j] = 1;
+        dist += 1;
+        if grid[k][j] >= my_height {
+            break;
+        }
+    }
+    score *= dist;
+    dist = 0;
+    // east
+    for k in j+1..n {
+        vis[i][k] = 1;
+        dist += 1;
+        if grid[i][k] >= my_height {
+            break;
+        }
+    }
+    score *= dist;
+    dist = 0;
+    // south
+    for k in i+1..n {
+        vis[k][j] = 1;
+        dist += 1;
+        if grid[k][j] >= my_height {
+            break;
+        }
+    }
+    score *= dist;
+    dist = 0;
+    // west
+    for k in (0..j).rev() {
+        vis[i][k] = 1;
+        dist += 1;
+        if grid[i][k] >= my_height {
+            break;
+        }
+    }
+    score *= dist;
+    score
+}
+
+// find the tree with the best visibility score
+fn find_best_vis(grid: &Grid) -> (usize, usize, u32) {
+    let mut best_i = 0;
+    let mut best_j = 0;
+    let mut best_score = 0;
+    let n = grid.len();
+    for i in 0..n {
+        for j in 0..n {
+            let score = find_vis_from(&grid, &mut create_grid(n), i, j);
+            if score > best_score {
+                best_i = i;
+                best_j = j;
+                best_score = score;
+            }
+        }
+    }
+    (best_i, best_j, best_score)
+}
+
 
 // sum the visibility
 fn sum_vis(vis: &Grid) -> u32 {
@@ -183,10 +267,12 @@ fn main() {
     find_vis_from_west(&grid, &mut vis);
     print_grid(&vis);
 
-    let vis = find_vis(grid);
+    let vis = find_vis(&grid);
     print_grid(&vis);
 
     let sum = sum_vis(&vis);
     println!("sum = {}", sum);
 
+    let (i, j, score) = find_best_vis(&grid);
+    println!("best tree at ({}, {}) with score {}", i, j, score);
 }
