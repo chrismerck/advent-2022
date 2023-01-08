@@ -104,92 +104,117 @@ $ ls
 7214296 k"
 */
 
-/* recursively build tree */
-// include prints for debugging
-fn build_tree(lines: &[String], current_dir: &mut Node, mut last_cmd: String) {
-    // null case
-    if lines.len() == 0 {
-        return;
+fn parse_input(lines: &[String]) -> Node {
+    let mut root = Node::new("/".to_string(), 0);
+    let mut last_cmd = "".to_string();
+    let mut breadcrumbs = Vec::new();
+    breadcrumbs.push(&mut root);
+    for line in lines {
+        parse_line(line, &mut last_cmd, &mut breadcrumbs);
     }
-    let mut words = lines[0].split_whitespace();
+    root
+}
+
+fn parse_line(line: &String, last_cmd: &mut String, breadcrumbs: &mut Vec<&mut Node>) {
+    // use subroutines for each command
+    let mut words = line.split_whitespace();
     let first = words.next().unwrap();
     match first {
         "$" => {
-            let second = words.next().unwrap();
-            last_cmd = second.to_string();
-            match second {
-                "cd" => {
-                    let third = words.next().unwrap();
-                    match third {
-                        "/" => {
-                            println!("cmd: cd root");
-                            if current_dir.name != "/" {
-                                println!("WARNING: cd to root unimplemented, ignoring");
-                            }
-                        }
-                        ".." => {
-                            println!("cmd: cd ..");
-                            /* go up one level by popping back up one level in the call stack */
-                            return;
-                        }
-                        _ => {
-                            println!("cmd: cd {}", third);
-                            /* recurse into subdirectory */
-                            let mut found : Option<&mut Node> = current_dir.children.iter_mut().find(|child| child.name == third);
-                            if found.is_none() {
-                                println!("WARNING: directory {} not found, creating implicitly", third);
-                                let new_dir = Node::new(third.to_string(), 0);
-                                current_dir.add_child(new_dir);
-                                found = current_dir.children.iter_mut().find(|child| child.name == third);
-                            }
-                            build_tree(&lines[1..], found.unwrap(), last_cmd);
-                            return;
-                        }
-                    }
-                }
-                "ls" => {
-                    println!("cmd: ls");
-                    /* as there are no arguments, and the replies come on later lines,
-                        we can just ignore this command other than remembering that it was last run */
-                }
-                _ => {
-                    println!("WARNING: unknown command {}", second);
-                }
+            parse_cmd(&mut words, last_cmd, breadcrumbs);
+        },
+        _ => {
+            parse_output(&mut words, last_cmd, breadcrumbs);
+        }
+    }
+}
+
+fn parse_cmd(words: &mut dyn Iterator<Item=&str>, last_cmd: &mut String, breadcrumbs: &mut Vec<&mut Node>) {
+    let second = words.next().unwrap();
+    *last_cmd = second.to_string();
+    match second {
+        "cd" => {
+            parse_cd(words, breadcrumbs);
+        },
+        "ls" => {
+            parse_ls(words, breadcrumbs);
+        },
+        _ => {
+            println!("WARNING: unknown command {}", second);
+        }
+    }
+}
+
+fn parse_cd(words: &mut dyn Iterator<Item=&str>, breadcrumbs: &mut Vec<&mut Node>) {
+    let third = words.next().unwrap();
+    let mut cwd = breadcrumbs.pop().unwrap();
+    match third {
+        "/" => {
+            println!("cmd: cd root");
+            if cwd.name != "/" {
+                println!("WARNING: cd to root unimplemented, ignoring");
             }
+            breadcrumbs.push(cwd);
+        }
+        ".." => {
+            println!("cmd: cd ..");
+            /* go up one level by popping back up one level in the call stack */
         }
         _ => {
-            match &last_cmd[..] {
-                "ls" => {
-                    let mut size = 0;
-                    let name;
-                    if first == "dir" {
-                        name = words.next().unwrap();
-                    } else {
-                        size = first.parse::<u64>().unwrap();
-                        name = words.next().unwrap();
-                    }
-                    let mut found = false;
-                    for child in &mut current_dir.children {
-                        if child.name == name {
-                            println!("WARNING: {} {} already exists, updating size", 
-                                match size { 0 => "dir", _ => "file" }, name);
-                            child.size = size;
-                            found = true;
-                            break;
-                        }
-                    }
-                    if !found {
-                        let new_file = Node::new(name.to_string(), size);
-                        current_dir.add_child(new_file);
-                    }
-                }
-                _ => {
-                    println!("WARNING: unexpected output for cmd {}", &last_cmd);
+            println!("cmd: cd {}", third);
+            /* go down one level by pushing down one level in the call stack */
+            let mut found = false;
+            for child in &mut cwd.children {
+                if child.name == third {
+                    breadcrumbs.push(cwd);
+                    breadcrumbs.push(child);
+                    found = true;
+                    break;
                 }
             }
         }
     }
-    build_tree(&lines[1..], current_dir, last_cmd);
+}
+
+fn parse_ls(words: &mut dyn Iterator<Item=&str>, breadcrumbs: &mut Vec<&mut Node>) {
+    println!("cmd: ls");
+    /* as there are no arguments, and the replies come on later lines,
+        we can just ignore this command other than remembering that it was last run */
+}
+
+fn parse_output(words: &mut dyn Iterator<Item=&str>, last_cmd: &mut String, breadcrumbs: &mut Vec<&mut Node>) {
+    match &last_cmd[..] {
+        "ls" => {
+            parse_ls_output(words, breadcrumbs);
+        },
+        _ => {
+            println!("WARNING: unexpected output for cmd {}", &last_cmd);
+        }
+    }
+}
+
+fn parse_ls_output(words: &mut dyn Iterator<Item=&str>, breadcrumbs: &mut Vec<&mut Node>) {
+    let mut size = 0;
+    let name;
+    let first = words.next().unwrap();
+    if first != "dir" {
+        size = first.parse::<u64>().unwrap();
+    }
+    name = words.next().unwrap();
+    let mut found = false;
+    for child in &mut breadcrumbs.last().unwrap().children {
+        if child.name == name {
+            println!("WARNING: {} {} already exists, updating size", 
+                match size { 0 => "dir", _ => "file" }, name);
+            child.size = size;
+            found = true;
+            break;
+        }
+    }
+    if !found {
+        let new_file = Node::new(name.to_string(), size);
+        breadcrumbs.last().unwrap().add_child(new_file);
+    }
 }
 
 fn main() {
@@ -200,10 +225,8 @@ fn main() {
         lines.push(line.unwrap());
     }
 
-    // build tree
-    let mut root = Node::new("/".to_string(), 0);
-    let current_dir = &mut root;
-    build_tree(&lines, current_dir, "".to_string());
+    // build tree 
+    let root = parse_input(&lines);
 
     // print it
     root.print(0);
