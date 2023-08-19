@@ -34,14 +34,60 @@ $ ls
 
 use std::io::{self, BufRead};
 use std::fs::File;
+use std::rc::{Rc, Weak};
 
-
-struct Node {
-    name: String,
-    size: u64,
-    children: Vec<Node>,
+struct TreeNode<T> {
+    data: T,
+    parent: Option<Weak<TreeNode<T>>>,
+    children: Vec<Rc<TreeNode<T>>>,
 }
 
+impl<T> TreeNode<T> {
+    fn new(data: T) -> Self {
+        Self {
+            data,
+            parent: None,
+            children: Vec::new(),
+        }
+    }
+
+    fn insert(&mut self, data: T) {
+        let mut new_node = TreeNode::new(data);
+        let new_node_rc = Rc::new(new_node);
+        new_node_rc.parent = Some(Rc::downgrade(&self.rc()));
+        self.children.push(new_node_rc);
+    }
+
+    fn search(&self, data: T) -> Option<Rc<TreeNode<T>>> {
+        if self.data == data {
+            return Some(self.rc());
+        }
+
+        for child in &self.children {
+            let result = child.search(data);
+            if result.is_some() {
+                return result;
+            }
+        }
+
+        return None;
+    }
+
+    fn rc(&self) -> Rc<TreeNode<T>> {
+        Rc::new(self.clone())
+    }
+}
+
+struct File {
+    name: String,
+    size: u64,
+}
+
+struct FileSystem {
+    root: TreeNode<File>,
+}
+
+/*
 impl Node {
     fn new(name: String, size: u64) -> Node {
         Node {
@@ -72,38 +118,48 @@ impl Node {
             child.print(indent + 1);
         }
     }
+}*/
+
+impl FileSystem {
+    fn new() -> Self {
+        Self {
+            root: TreeNode::new(File {
+                name: "/".to_string(),
+                size: 0,
+            }),
+        }
+    }
+
+    fn add_file(&mut self, path: &str, size: u64) {
+
+    fn get_size_recursive(&self, path: &str) -> u64 {
+        let mut path_parts = path.split("/");
+        let mut current_node = &self.root;
+        for part in path_parts {
+            if part == "" {
+                continue;
+            }
+            let mut found = false;
+            for child in &current_node.children {
+                if child.data.name == part {
+                    current_node = child;
+                    found = true;
+                    break;
+                }
+            }
+            if !found {
+                return 0;
+            }
+        }
+        current_node.data.size
+    }
+
+    fn print(&self) {
+        self.root.print(0);
+    }
 }
 
 // read from file "input" and build tree
-/*
-
-Input example:
-
-"$ cd /
-$ ls
-dir a
-14848514 b.txt
-8504156 c.dat
-dir d
-$ cd a
-$ ls
-dir e
-29116 f
-2557 g
-62596 h.lst
-$ cd e
-$ ls
-584 i
-$ cd ..
-$ cd ..
-$ cd d
-$ ls
-4060174 j
-8033020 d.log
-5626152 d.ext
-7214296 k"
-*/
-
 fn parse_input(lines: &[String]) -> Node {
     let mut root = Node::new("/".to_string(), 0);
     let mut last_cmd = "".to_string();
